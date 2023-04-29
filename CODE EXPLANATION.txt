@@ -1,0 +1,186 @@
+TASK - 1
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+The code aims to load multiple CSV files containing tweet data and preprocess the text data to prepare it for analysis.
+
+The first section of the code loads 13 CSV files using a for loop and concatenates them into a single pandas DataFrame. The code then filters the DataFrame to include only the columns 'external_author_id', 'content', 'language', and 'publish_date'. The next step is to filter for English tweets only by selecting rows where the 'language' column equals 'English'. The filtered DataFrame is then saved as a CSV file named 'raw_data.csv'.
+
+In the preprocessing section of the code, the SnowballStemmer from the nltk package is instantiated with the language set to 'english', and a set of stop words is created using the stopwords package. The 'content' column of the DataFrame is then processed using several lambda functions.
+
+First, any non-string values are converted to a string using the str() function. Next, any URLs in the tweet text are removed using regular expressions with the re.sub() function. Then, the text is converted to lowercase, stop words are removed, and stemming is applied to reduce the words to their root form using the stemmer object.
+
+Finally, all non-alphanumeric characters are removed from the text data using regular expressions with the re.sub() function. The preprocessed DataFrame is saved as a CSV file named 'preprocessed_data.csv'.
+
+The DataFrame is reset with a new index using the reset_index() method with the parameter drop=True, which removes the old index column from the DataFrame.
+
+The last line of the code prints the first five rows of the preprocessed DataFrame using the head() method to verify that the preprocessing steps were applied correctly.
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+TASK - 2A
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+This code is related to building an inverted index for the preprocessed dataset created in the previous code block. An inverted index is a data structure that stores a mapping between terms in a corpus and the documents that contain them. It is used for efficient searching and retrieval of documents containing specific terms.
+
+The code first creates an empty defaultdict called inverted_index. A defaultdict is a dictionary-like object that creates a new key-value pair if the key doesn't exist already. In this case, the value is a list that will store the document ids containing the term.
+
+Next, the code creates a mapping between the document ids and their content by iterating through each row of the preprocessed DataFrame using iterrows(). For each row, it stores the document id as the index of the row, along with the external author id and publish date. It also splits the preprocessed content into terms and adds each term to the inverted index by appending the document id to its list of document ids.
+
+Finally, the code writes the inverted index to a text file called inverted_index.txt, where each line contains a term followed by its corresponding list of document ids. It also previews the first 10 terms and their document ids using a for loop.
+
+Overall, this code block creates an inverted index for the preprocessed dataset and writes it to a file for future use in information retrieval tasks.
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+TASK - 2B
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+The code is related to a boolean retrieval model that searches for documents containing a given query. Here is the explanation of the code:
+
+The first two lines load the preprocessed corpus of tweets into two lists: 'corpus' and 'corpus_raw'.
+python
+Copy code
+corpus = df['content'].tolist()
+corpus_raw = pd.read_csv('raw_data.csv')['content'].tolist()
+
+The function 'clean_text' takes a string and performs several text cleaning operations, such as removing URLs, removing punctuation, and converting text to lowercase. It returns a list of tokens.
+python
+Copy code
+def clean_text(text):
+    text = re.sub(r"http\S+", "", text)  # Remove URLs
+    text = re.sub(r'[^\w\s]', '', text)  # Remove punctuation
+    text = text.lower()  # Convert text to lowercase
+    return text.split()
+
+The 'boolean_model' function is the core of the code. It takes a query string as an argument, applies the 'clean_text' function to it, splits it into terms, and retrieves the documents that match the query.
+python
+Copy code
+def boolean_model(query):
+    # Pre-process the query
+    query = clean_text(query)
+    
+    # Split query into terms
+    if not query:
+        return []
+    terms = query
+    
+    # Find matching documents for each term
+    results = []
+    for term in terms:
+        if term in inverted_index:
+            results.append(inverted_index[term])
+        else:
+            results.append(set())
+    
+    # Combine the sets using Boolean operators
+    combined_results = set()
+    for i, term_result in enumerate(results):
+        term_result = set(term_result) # convert list to set
+        if i == 0:
+            combined_results = term_result
+        else:
+            if terms[i-1] == 'and':
+                combined_results = combined_results.intersection(term_result)
+            elif terms[i-1] == 'or':
+                combined_results = combined_results.union(term_result)
+    
+    # Get the documents matching all terms
+    matching_docs = [corpus_raw[i] for i in combined_results]
+    
+    return matching_docs
+
+
+The 'boolean_model' function first cleans the query string using the 'clean_text' function. It then checks whether the query contains any terms. If not, it returns an empty list.
+
+The function then searches for matching documents for each query term. It does so by looking up the terms in the inverted index, which is a dictionary where each key is a term and its value is a list of document ids that contain that term.
+
+If a term is not found in the inverted index, the function adds an empty set to the 'results' list for that term. Otherwise, it adds the list of document ids for that term to the 'results' list.
+
+The function then combines the sets of document ids using Boolean operators. If the query contains only one term, the function returns the set of document ids for that term. Otherwise, it iterates over the terms and combines the sets using 'and' and 'or' operators as appropriate.
+
+Finally, the function returns the documents that match all terms in the query. The matching documents are retrieved from the 'corpus_raw' list using their document ids.
+
+The last two lines test the 'boolean_model' function by searching for tweets containing the query "trump and russia". The function returns a list of matching documents, and the code prints the top 25 matching documents.
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+TASK - 3
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+The code defines three functions related to text search and evaluation:
+
+handle_wildcard_query(query): This function handles wildcard queries by converting the query to a regular expression pattern and using it to match terms in the inverted index. The function takes a query string as input, replaces any * characters with .* in the pattern, compiles a regular expression object, and uses it to find matching terms in the inverted index. The function returns a set of document IDs that contain any of the matching terms.
+
+handle_phrase_query(query): This function handles phrase queries by searching for exact sequences of words in the text. The function removes URLs and punctuation from the query, converts the query to lowercase, and splits it into individual terms. It then searches each document in the data frame for the first occurrence of the first query term, and checks if the following terms match the subsequent terms in the query. If the terms match, the document ID is added to a list of matching documents. The function returns the list of document IDs.
+
+calc_precision_recall(relevant_docs, retrieved_docs): This function calculates the precision and recall of a query result given a set of relevant documents and a set of retrieved documents. The function takes two sets of document IDs as input and calculates the true positives (TP), false positives (FP), and false negatives (FN) for the query. It then calculates the precision and recall using the formulae precision = TP / (TP + FP) and recall = TP / (TP + FN), and returns them as a tuple.
+
+The code also includes two example usage functions:
+
+query_app(wq, pq): This function takes a wildcard query and a phrase query as input, calls the handle_wildcard_query() and handle_phrase_query() functions, and prints the resulting document IDs.
+
+query_pr_app(wq, pq, relevant_docs): This function is similar to query_app(), but also takes a set of relevant documents as input, calculates the precision and recall for both the wildcard and phrase queries using the calc_precision_recall() function, and prints the results along with the relevant document count.
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+TASK - 4
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+This code defines a search engine that retrieves documents based on cosine similarity between a user query and documents in a corpus.
+
+First, the code defines the corpus as the 'content' column of a pandas DataFrame df and as a raw list corpus_raw.
+
+Next, a function clean_text is defined to tokenize and clean the input text. The function removes URLs, punctuation, and converts text to lowercase.
+
+The main function retrieve_using_cosine_similarity takes a user query and a number of documents to return as input. The function first tokenizes and cleans the query using the clean_text function. It then retrieves documents containing at least one query term from an inverted index. The inverted index is a dictionary where each key is a term in the corpus and its value is a set of document IDs that contain that term.
+
+Next, the function calculates the cosine similarity between the query and candidate documents using the TfidfVectorizer and cosine_similarity functions from the sklearn library.
+
+The function sorts the candidate documents by cosine similarity in descending order and returns the top documents along with their cosine similarity scores. The function also calculates the precision and recall of the search results.
+
+Finally, the function prints the top documents with their rank, cosine similarity score, and reason for their rank (i.e., high cosine similarity score with the query terms). The function returns the top documents along with their precision and recall.
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+TASK - 5
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+This code is part of a search engine implementation that retrieves documents relevant to a user's query based on their likelihood of containing relevant information.
+
+The first two lines define the corpus, which is a list of all the documents in the search engine. The first line retrieves the content of each document from a Pandas DataFrame called df, while the second line retrieves the same content from a CSV file called raw_data.csv.
+
+The log_likelihood function takes in a query, the number of documents to retrieve, the IDs of relevant documents, and a flag q to indicate if this is a query for evaluation. The function first tokenizes the query and computes the likelihood of each token using a bag-of-words model. The likelihood of a token is defined as the number of times it appears in the query divided by the total number of tokens in the query.
+
+Next, the function retrieves all documents that contain any of the query tokens from an inverted index. An inverted index is a data structure that maps each term in the corpus to the documents that contain it. For each retrieved document, the function computes its likelihood of being relevant to the query using a language model. The likelihood of a document is defined as the product of the likelihoods of each query token in the document. If a token is not found in the document, its likelihood is set to 1 over the length of the document plus 1. This is a common smoothing technique to handle zero probabilities.
+
+The retrieved documents are ranked by their likelihood, and the top num_docs are printed along with their likelihood and whether they are relevant or not. If q is 1, indicating that this is a query for evaluation, the function also calculates the precision and recall of the retrieved documents. Precision is the proportion of retrieved documents that are relevant, while recall is the proportion of relevant documents that are retrieved.
+
+Overall, this function computes the likelihood of each document being relevant to a query and ranks them by their likelihood. This approach is based on language models and is commonly used in information retrieval.
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+TASK - 7
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+This code performs a search over a corpus of documents using cosine similarity and relevance feedback, and then re-ranks the results based on the feedback.
+
+First, the code defines the corpus by getting the 'content' column from a pandas DataFrame df, and also reads a raw corpus from a CSV file named 'raw_data.csv'. Then, a TfidfVectorizer is created and fit on the corpus, transforming the corpus into a sparse matrix of TF-IDF weights.
+
+The retrieve_using_cosine_similarity_with_feedback function takes a query string and optional parameters num_docs, alpha, beta, and gamma. The function first transforms the query string using the vectorizer and calculates the cosine similarity between the query and all documents in the corpus. The top num_docs documents with the highest cosine similarity scores are retrieved and stored in a list along with their similarity scores.
+
+The function then asks the user for feedback on the relevance of each of the top documents. The user responds by entering 'y' or 'n' for each document, indicating whether it is relevant or not. The indices of the relevant and non-relevant documents are stored in two separate lists.
+
+Next, the function calculates a new query vector using the Rocchio algorithm. The new query vector is a linear combination of the original query vector, the mean vector of the relevant documents, and the negative mean vector of the non-relevant documents, weighted by the parameters alpha, beta, and gamma respectively. The cosine similarity between the new query vector and all documents in the corpus is calculated, and the top num_docs documents with the highest cosine similarity scores are retrieved and stored in a list along with their similarity scores.
+
+Finally, the function prints the top num_docs documents from the re-ranked list along with their cosine similarity scores and a reason for their high ranking. The reason is that the document has a high cosine similarity score with the re-ranked query.
+
+The function is called with the query "donald trump", which means that it will retrieve the most similar documents to this query, ask the user to provide feedback on the relevance of each of the top documents, and then re-rank the documents based on the feedback.
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+NOTE
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+set low_memory=False.
+In Pandas, the low_memory parameter is an optional argument that can be passed to the read_csv() function, which is used to read data from CSV files into a DataFrame. By default, Pandas tries to infer the data types of each column of the CSV file based on the first 100,000 rows of data.
+
+When low_memory is set to False, Pandas reads the entire CSV file into memory before inferring the data types. This can be useful for large datasets where the data types of each column are not consistent across the first 100,000 rows.
+
+However, setting low_memory to False can also result in higher memory usage and slower performance, particularly for very large CSV files. It is usually recommended to leave low_memory at its default value (True) unless you have a good reason to set it to False.
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+
